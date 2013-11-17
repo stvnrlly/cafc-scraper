@@ -19,6 +19,8 @@ if '-w' in sys.argv:
   start = 'http://www.cafc.uscourts.gov/opinions-orders/7/all'
 elif '-m' in sys.argv:
   start = 'http://www.cafc.uscourts.gov/opinions-orders/30/all'
+elif '-y' in sys.argv:
+  start = 'http://www.cafc.uscourts.gov/opinions-orders/365/all'
 urls = [start]
 for url in urls:
   url = requests.get(url)
@@ -26,26 +28,23 @@ for url in urls:
   if soup.find('a', title='Next'):
     urls.append('http://www.cafc.uscourts.gov' + soup.find('a', title='Next')['href'])
 
-print urls
-
 for url in urls:
   soup = BeautifulSoup(requests.get(url).content)
   cases = soup.find_all(class_=['even','odd'])
-
   for item in cases:
     tds = item.find_all('td')
     number = tds[1].text.strip()  # DATA: The case number
-    split = re.split("[ \t]\[", tds[3].text.strip())
-    name = split[0]  # DATA: The case caption
+    name = re.match('^.*?(?=\s\[)', tds[3].text.strip()).group(0)  # DATA: The case caption
+    date = tds[0].text.strip()  # DATA: The date of the decision
     check = []  # Check if we have this decision already (each case can include multiple decisions)
     try:
       for entry in output[name]['info']:
-        check.append(entry['number'])
+        check.append(entry['number'] + entry['date'])
     except KeyError:
       pass
-    if number in check:
+    if number + date in check:
       continue
-    date = tds[0].text.strip()  # DATA: The date of the decision
+    print name, number, date
     link = 'http://www.cafc.uscourts.gov' + tds[3].a['href']  # DATA: The link to the PDF
     r = requests.get(link)  # Get the PDF and save it
     file_stem = 'cafc_cases/' + name + ' ' + number
@@ -57,7 +56,7 @@ for url in urls:
         fd.write(chunk)
     subprocess.call('pdftotext -layout -enc UTF-8 "' + new_pdf + '" > "' + new_txt + '"', shell = True) # Convert PDF to TXT for easier searching
     precedent = tds[4].text.strip()  # DATA: Precedential value
-    variety = split[1][0:len(split[1])-1]  # DATA: What type of decision was issued
+    variety = re.search('(?<=\[).*(?=\])', tds[3].text.strip()).group(0)  # DATA: What type of decision was issued
     with open(new_txt, 'r') as txt:
       contents = re.sub('\n', ' ', txt.read())
       contents = re.sub('\s+', ' ', contents)
@@ -68,16 +67,15 @@ for url in urls:
       with open (new_txt, 'r') as txt:
         contents = re.sub('\n', ' ', txt.read())
         contents = re.sub('\s+', ' ', contents)
-    if variety[:5] not in ['ERRAT', 'ORDER']:  # DATA: The 3 judges on the panel
+    if (variety.find('ERRATA') > -1) or (variety.find('ORDER') > -1):  # DATA: The 3 judges on the panel
+      judges = 'Judges not stated'
+    else:
       judges = re.sub('(\(|\)|-\s)', '', re.search('(?<=(Before\s|CURIAM\s)).*?\.', contents).group(0))
       judges = judges.decode('utf-8')
-    else:
-      judges = 'Judges not stated'
-    if variety != 'ERRATA':  # DATA: Where the case originated
-      print number
-      source = re.search('(Appeal(s)?\sfrom|(On\s)?Petition\s)(.|\n)*?(?<!(\sNo|Nos|.\s.))\.', contents).group(0)
-    else:
+    if variety.find('ERRATA') > -1:  # DATA: Where the case originated
       source = 'Correction to previous Federal Circuit decision'
+    else:
+      source = re.search('(Appeal(s)?\sfrom|(On\s)?Petition)(.|\n)*?(?<!(\sNo|Nos|.\s.))\.', contents).group(0)
     data = {  # Create JSON contents
         'number': number,
         'date': date,
@@ -92,7 +90,7 @@ for url in urls:
       output[name] = OrderedDict()
       output[name]['info'] = []
       output[name]['info'].append(data)
-    trigger = True  # Activate the email
+#    trigger = True  # Activate the email
     addition = name + ', ' + number + '\n' + source + '\nPanel: ' + judges + '\nPDF: ' + link + '\n\n'
     if precedent == 'Precedential':
       section_1 += addition
@@ -100,8 +98,8 @@ for url in urls:
       section_2 += addition
 
 output = json.dumps(output, indent=True, ensure_ascii=False)  # Write that file
-with open('cafc_cases.json', 'w') as f:
-      f.write(output)
+#with open('cafc_cases.json', 'w') as f:
+#      f.write(output)
 
 if trigger: # Send the email if there are new cases
   if not os.path.exists('email_addresses.py'):
