@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import requests, json, re, subprocess, ghostscript, os, getpass
+import requests, sys, json, re, subprocess, ghostscript, os, getpass
 from bs4 import BeautifulSoup
 from collections import OrderedDict
 
@@ -14,7 +14,12 @@ try:
 except ValueError:  # In case the JSON file is empty for some reason
   output = OrderedDict()
 
-urls = ['http://www.cafc.uscourts.gov/opinions-orders/30/all']
+start = 'http://www.cafc.uscourts.gov/opinions-orders/'
+if '-w' in sys.argv:
+  start = 'http://www.cafc.uscourts.gov/opinions-orders/7/all'
+elif '-m' in sys.argv:
+  start = 'http://www.cafc.uscourts.gov/opinions-orders/30/all'
+urls = [start]
 for url in urls:
   url = requests.get(url)
   soup = BeautifulSoup(url.content)
@@ -31,7 +36,7 @@ for url in urls:
     tds = item.find_all('td')
     number = tds[1].text.strip()  # DATA: The case number
     split = re.split("[ \t]\[", tds[3].text.strip())
-    name = split[0] # DATA: The case caption
+    name = split[0]  # DATA: The case caption
     check = []  # Check if we have this decision already (each case can include multiple decisions)
     try:
       for entry in output[name]['info']:
@@ -51,8 +56,8 @@ for url in urls:
       for chunk in r.iter_content(1024):
         fd.write(chunk)
     subprocess.call('pdftotext -layout -enc UTF-8 "' + new_pdf + '" > "' + new_txt + '"', shell = True) # Convert PDF to TXT for easier searching
-    precedent = tds[4].text.strip() # DATA: Precedential value
-    variety = split[1][0:len(split[1])-1] # DATA: What type of decision was issued
+    precedent = tds[4].text.strip()  # DATA: Precedential value
+    variety = split[1][0:len(split[1])-1]  # DATA: What type of decision was issued
     with open(new_txt, 'r') as txt:
       contents = re.sub('\n', ' ', txt.read())
       contents = re.sub('\s+', ' ', contents)
@@ -63,12 +68,12 @@ for url in urls:
       with open (new_txt, 'r') as txt:
         contents = re.sub('\n', ' ', txt.read())
         contents = re.sub('\s+', ' ', contents)
-    if variety[:5] not in ['ERRAT', 'ORDER']: #DATA: The 3 judges on the panel
+    if variety[:5] not in ['ERRAT', 'ORDER']:  # DATA: The 3 judges on the panel
       judges = re.sub('(\(|\)|-\s)', '', re.search('(?<=(Before\s|CURIAM\s)).*?\.', contents).group(0))
       judges = judges.decode('utf-8')
     else:
       judges = 'Judges not stated'
-    if variety != 'ERRATA': #DATA: Where the case originated
+    if variety != 'ERRATA':  # DATA: Where the case originated
       print number
       source = re.search('(Appeal(s)?\sfrom|(On\s)?Petition\s)(.|\n)*?(?<!(\sNo|Nos|.\s.))\.', contents).group(0)
     else:
@@ -95,8 +100,8 @@ for url in urls:
       section_2 += addition
 
 output = json.dumps(output, indent=True, ensure_ascii=False)  # Write that file
-#with open('cafc_cases.json', 'w') as f:
-#      f.write(output)
+with open('cafc_cases.json', 'w') as f:
+      f.write(output)
 
 if trigger: # Send the email if there are new cases
   if not os.path.exists('email_addresses.py'):
