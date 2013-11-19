@@ -1,10 +1,10 @@
 #!/usr/bin/python
 
-import requests, sys, json, re, subprocess, ghostscript, os, getpass
+import requests, sys, json, re, subprocess, ghostscript, os, getpass, smtplib
 from bs4 import BeautifulSoup
 from collections import OrderedDict
 
-msg = '\nThere are new Federal Circuit cases!\n\n'
+msg = '\nNo new cases today.\n\n'
 section_1 = 'Precedential\n\n'
 section_2 = '\n\nNonprecedential\n\n'
 trigger = False
@@ -34,7 +34,7 @@ for url in urls:
   for item in cases:
     tds = item.find_all('td')
     number = tds[1].text.strip()  # DATA: The case number
-    name = re.match('^.*?(?=\s\[)', tds[3].text.strip()).group(0)  # DATA: The case caption
+    name = re.search('^.*?(?=\s\[)', tds[3].text.strip()).group(0)  # DATA: The case caption
     date = tds[0].text.strip()  # DATA: The date of the decision
     check = []  # Check if we have this decision already (each case can include multiple decisions)
     try:
@@ -44,7 +44,7 @@ for url in urls:
       pass
     if number + date in check:
       continue
-    print name, number, date
+    print name, number
     link = 'http://www.cafc.uscourts.gov' + tds[3].a['href']  # DATA: The link to the PDF
     r = requests.get(link)  # Get the PDF and save it
     file_stem = 'cafc_cases/' + name + ' ' + number
@@ -58,24 +58,34 @@ for url in urls:
     precedent = tds[4].text.strip()  # DATA: Precedential value
     variety = re.search('(?<=\[).*(?=\])', tds[3].text.strip()).group(0)  # DATA: What type of decision was issued
     with open(new_txt, 'r') as txt:
-      contents = re.sub('\n', ' ', txt.read())
-      contents = re.sub('\s+', ' ', contents)
-    if len(contents) == 1:  # Perform emergency OCR, if necessary
-      txt.close()
-      ghostscript.Ghostscript('-sDEVICE=tiffg4 -dNOPAUSE -r600x600 -sOutputFile="' + new_tiff + '" "' + new_pdf + '"')
-      subprocess.call('tesseract "' + new_tiff + '" "' + file_stem + '"', shell=True)
-      with open (new_txt, 'r') as txt:
-        contents = re.sub('\n', ' ', txt.read())
-        contents = re.sub('\s+', ' ', contents)
+      contents = re.sub('\t+', ' ', txt.read())
+#    if len(contents) < 10:  # Perform emergency OCR, if necessary
+#      txt.close()
+#      subprocess.call('touch "' + new_tiff + '"', shell=True)
+#      subprocess.call(['gs', '-sDEVICE=tiffg4', '-dNOPAUSE', '-r600x600', '-sOutputFile="./' + new_tiff + '"', '"./' + new_pdf +'"'])
+#      ghostscript.Ghostscript('quit')
+#      subprocess.call('tesseract "' + new_tiff + '" "' + file_stem + '"', shell=True)
+#      with open (new_txt, 'r') as txt:
+#        contents = re.sub('\t+', ' ', txt.read())
     if (variety.find('ERRATA') > -1) or (variety.find('ORDER') > -1):  # DATA: The 3 judges on the panel
       judges = 'Judges not stated'
     else:
-      judges = re.sub('(\(|\)|-\s)', '', re.search('(?<=(Before\s|CURIAM\s)).*?\.', contents).group(0))
+      try:
+        ruling = re.sub('\s+', ' ', re.search('(AFFIRMED|REVERSED|REMANDED|VACATED|DISMISSED)(.|\n)*?(?=(\.|$|(?<=D)\n))', contents).group(0))
+        ruling = ruling.title()
+      except AttributeError:
+        ruling = 'Unmarked. Check the PDF.'
+      try:
+        judges = re.sub('(\(|\)|-\s)', '', re.search('(?<=(Before\s|CURIAM\s|Curiam\s))(.|\n)*?(?=\.)', contents).group(0))
+      except AttributeError:
+        judges = re.search('PER\sCURIAM', contents).group(0)
+      judges = re.sub('\s+', ' ', judges).title()
       judges = judges.decode('utf-8')
     if variety.find('ERRATA') > -1:  # DATA: Where the case originated
       source = 'Correction to previous Federal Circuit decision'
     else:
-      source = re.search('(Appeal(s)?\sfrom|(On\s)?Petition)(.|\n)*?(?<!(\sNo|Nos|.\s.))\.', contents).group(0)
+      source = re.sub('\n', ' ', re.search('(Appeal(s)?\sfrom|(On\s)?Petition[^er])(.|\n)*?(?<!(\sNo|Nos|.\s.))\.', contents).group(0))
+      source = source.title()
     data = {  # Create JSON contents
         'number': number,
         'date': date,
@@ -83,6 +93,8 @@ for url in urls:
         'precedent': precedent,
         'variety': variety,
         'source': source,
+        'judges': judges,
+        'ruling': ruling,
       }
     try:  # If the case exists already, add this decision as part of it
       output[name]['info'].append(data)
@@ -90,8 +102,9 @@ for url in urls:
       output[name] = OrderedDict()
       output[name]['info'] = []
       output[name]['info'].append(data)
-#    trigger = True  # Activate the email
-    addition = name + ', ' + number + '\n' + source + '\nPanel: ' + judges + '\nPDF: ' + link + '\n\n'
+    trigger = True  # Turn the email positive
+    msg = '\nThere are new Federal Circuit cases!\n\n'
+    addition = name + ', ' + number + '\nRuling: ' + ruling + '\n' + source + '\nPanel: ' + judges + '\nPDF: ' + link + '\n\n'
     if precedent == 'Precedential':
       section_1 += addition
     else:
@@ -101,23 +114,24 @@ output = json.dumps(output, indent=True, ensure_ascii=False)  # Write that file
 #with open('cafc_cases.json', 'w') as f:
 #      f.write(output)
 
-if trigger: # Send the email if there are new cases
-  if not os.path.exists('email_addresses.py'):
-    sender = input('Enter sending GMail address: ')
-    password = getpass.getpass('Enter sending address password: ')
-    recipients = input('Enter recipient addresses, separated by commas: ')
-  else:
-    exec(compile(open('email_addresses.py').read(), 'update_anc_database_creds.py', 'exec'))
-  if len(section_1) < 25:
-    section_1 += 'None\n\n'
-  if len(section_2) < 25:
-    section_2 += 'None'
+# Send the email if there are new cases
+if not os.path.exists('email_addresses.py'):
+  sender = input('Enter sending GMail address: ')
+  password = getpass.getpass('Enter sending address password: ')
+  recipients = input('Enter recipient addresses, separated by commas: ')
+else:
+  exec(compile(open('email_addresses.py').read(), 'update_anc_database_creds.py', 'exec'))
+if len(section_1) < 25:
+  section_1 += 'None\n\n'
+if len(section_2) < 25:
+  section_2 += 'None'
+if trigger:
   msg = msg + section_1 + section_2
-  msg = 'From: ' + sender + '\nTo: ' + recipients + '\nSubject: New Federal Circuit Cases' + msg # Build the email text
-  msg = msg.encode('utf-8')
-  import smtplib
-  server = smtplib.SMTP('smtp.gmail.com:587')
-  server.ehlo()
-  server.starttls()
-  server.login(sender, password)
-  server.sendmail(sender, [recipients], msg)
+msg = 'From: ' + sender + '\nTo: ' + recipients + '\nSubject: New Federal Circuit Cases' + msg # Build the email text
+msg = msg.encode('utf-8')
+print msg
+server = smtplib.SMTP('smtp.gmail.com:587')
+server.ehlo()
+server.starttls()
+server.login(sender, password)
+#server.sendmail(sender, [recipients], msg)
