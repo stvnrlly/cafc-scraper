@@ -67,18 +67,18 @@ for url in urls:
 #      subprocess.call('tesseract "' + new_tiff + '" "' + file_stem + '"', shell=True)
 #      with open (new_txt, 'r') as txt:
 #        contents = re.sub('\t+', ' ', txt.read())
-    if (variety.find('ERRATA') > -1) or (variety.find('ORDER') > -1):  # DATA: The 3 judges on the panel
-      judges = 'Judges not stated'
-    else:
       try:
-        ruling = re.sub('\s+', ' ', re.search('(AFFIRMED|REVERSED|REMANDED|VACATED|DISMISSED)(.|\n)*?(?=(\.|$|(?<=D)\n))', contents).group(0))
+        ruling = re.sub('\s+', ' ', re.search('(AFFIRMED|REVERSED|REMANDED|VACATED|DISMISSED)(.|\n)*?(?=(\.|$|(?<=ED)\n))', contents).group(0))
         ruling = ruling.title()
       except AttributeError:
-        ruling = 'Unmarked. Check the PDF.'
+        ruling = 'Unmarked ' + variety.lower() + '. Check the PDF.'
       try:
         judges = re.sub('(\(|\)|-\s)', '', re.search('(?<=(Before\s|CURIAM\s|Curiam\s))(.|\n)*?(?=\.)', contents).group(0))
       except AttributeError:
-        judges = re.search('PER\sCURIAM', contents).group(0)
+        try:
+          judges = re.search('PER\sCURIAM', contents).group(0)
+        except AttributeError:
+          judges = 'Judges not stated'
       judges = re.sub('\s+', ' ', judges).title()
       judges = judges.decode('utf-8')
     if variety.find('ERRATA') > -1:  # DATA: Where the case originated
