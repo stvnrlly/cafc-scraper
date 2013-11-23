@@ -67,20 +67,20 @@ for url in urls:
 #      subprocess.call('tesseract "' + new_tiff + '" "' + file_stem + '"', shell=True)
 #      with open (new_txt, 'r') as txt:
 #        contents = re.sub('\t+', ' ', txt.read())
+    try:
+      ruling = re.sub('\s+', ' ', re.search('(AFFIRMED|REVERSED|REMANDED|VACATED|DISMISSED)(.|\n)*?(?=(\.|$|(?<=ED)\n))', contents).group(0))
+      ruling = ruling.title()
+    except AttributeError:
+      ruling = 'Unmarked ' + variety.lower() + '. Check the PDF.'
+    try:
+      judges = re.sub('(\(|\)|-\s)', '', re.search('(?<=(Before\s|CURIAM\s|Curiam\s))(.|\n)*?(?=\.)', contents).group(0))
+    except AttributeError:
       try:
-        ruling = re.sub('\s+', ' ', re.search('(AFFIRMED|REVERSED|REMANDED|VACATED|DISMISSED)(.|\n)*?(?=(\.|$|(?<=ED)\n))', contents).group(0))
-        ruling = ruling.title()
+        judges = re.search('PER\sCURIAM', contents).group(0)
       except AttributeError:
-        ruling = 'Unmarked ' + variety.lower() + '. Check the PDF.'
-      try:
-        judges = re.sub('(\(|\)|-\s)', '', re.search('(?<=(Before\s|CURIAM\s|Curiam\s))(.|\n)*?(?=\.)', contents).group(0))
-      except AttributeError:
-        try:
-          judges = re.search('PER\sCURIAM', contents).group(0)
-        except AttributeError:
-          judges = 'Judges not stated'
-      judges = re.sub('\s+', ' ', judges).title()
-      judges = judges.decode('utf-8')
+        judges = 'Judges not stated'
+    judges = re.sub('\s+', ' ', judges).title()
+    judges = judges.decode('utf-8')
     if variety.find('ERRATA') > -1:  # DATA: Where the case originated
       source = 'Correction to previous Federal Circuit decision'
     else:
@@ -127,11 +127,11 @@ if len(section_2) < 25:
   section_2 += 'None'
 if trigger:
   msg = msg + section_1 + section_2
-msg = 'From: ' + sender + '\nTo: ' + recipients + '\nSubject: New Federal Circuit Cases' + msg # Build the email text
+msg = 'From: ' + sender + '\nTo: ' + ', '.join(recipients) + '\nSubject: New Federal Circuit Cases' + msg # Build the email text
 msg = msg.encode('utf-8')
 print msg
 server = smtplib.SMTP('smtp.gmail.com:587')
 server.ehlo()
 server.starttls()
 server.login(sender, password)
-#server.sendmail(sender, [recipients], msg)
+#server.sendmail(sender, recipients, msg)
