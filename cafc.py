@@ -4,7 +4,7 @@ import requests, sys, json, re, subprocess, ghostscript, os, getpass, smtplib
 from bs4 import BeautifulSoup
 from collections import OrderedDict
 
-msg = '\nNo new cases today.\n\n'
+msg = '\nNo new cases.\n\n'
 section_1 = 'Precedential\n\n'
 section_2 = '\n\nNonprecedential\n\n'
 trigger = False
@@ -127,7 +127,7 @@ if len(section_2) < 25:
   section_2 += 'None'
 if trigger:
   msg = msg + section_1 + section_2
-msg = 'From: ' + sender + '\nTo: ' + ', '.join(recipients) + '\nSubject: New Federal Circuit Cases' + msg # Build the email text
+msg = 'From: ' + sender + '\nTo: ' + ', '.join(recipients) + '\nSubject: Federal Circuit Report' + msg # Build the email text
 msg = msg.encode('utf-8')
 print msg
 server = smtplib.SMTP('smtp.gmail.com:587')
