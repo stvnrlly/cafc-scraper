@@ -42,29 +42,7 @@ for url in urls:
   if soup.find('a', title='Next'):
     urls.append('http://www.cafc.uscourts.gov' + soup.find('a', title='Next')['href'])
 
-for url in urls:
-  soup = BeautifulSoup(requests.get(url).content)
-  cases = soup.find_all(class_=['even','odd'])
-  for item in cases:
-    tds = item.find_all('td')
-    number = tds[1].text.strip()  # DATA: The case number
-    name = re.search('^.*?(?=\s\[)', tds[3].text.strip()).group(0)  # DATA: The case caption
-    date = tds[0].text.strip()  # DATA: The date of the decision
-    check = []  # Check if we have this decision already (each case can include multiple decisions)
-    try:
-      for entry in output[name]['info']:
-        check.append(entry['number'] + entry['date'])
-    except KeyError:
-      pass
-    if number + date in check:
-      continue
-    print name, number
-    link = 'http://www.cafc.uscourts.gov' + tds[3].a['href']  # DATA: The link to the PDF
-    r = requests.get(link)  # Get the PDF and save it
-    file_stem = 'cafc_cases/' + name + ' ' + number
-    new_pdf = file_stem + '.pdf'
-    new_txt = file_stem + '.txt'
-    new_tiff = file_stem + '.tiff'
+def pdf_read(new_pdf, new_txt):
     with open(new_pdf, 'wb') as fd:
       for chunk in r.iter_content(1024):
         fd.write(chunk)
@@ -98,7 +76,7 @@ for url in urls:
     if variety.find('ERRATA') > -1:  # DATA: Where the case originated
       source = 'Correction to previous Federal Circuit decision'
     else:
-      source = re.sub('\n', ' ', re.search('(Appeal(s)?\sfrom|(On\s)?Petition[^er])(.|\n)*?(?<!(\sNo|Nos|.\s.))\.', contents).group(0))
+      source = re.sub('\n', ' ', re.search('(On\sappeal|Appeal(s)?\sfrom|(On\s)?Petition[^er])(.|\n)*?(?<!(\sNo|Nos|.\s.))\.', contents).group(0))
       source = source.title()
     data = {  # Create JSON contents
         'number': number,
@@ -110,6 +88,34 @@ for url in urls:
         'judges': judges,
         'ruling': ruling,
       }
+    return data
+
+for url in urls:
+  soup = BeautifulSoup(requests.get(url).content)
+  cases = soup.find_all(class_=['even','odd'])
+  for item in cases:
+    tds = item.find_all('td')
+    number = tds[1].text.strip()  # DATA: The case number
+    name = re.search('^.*?(?=\s\[)', tds[3].text.strip()).group(0)  # DATA: The case caption
+    name = re.sub('/', ' ', name)  # Take out slashes, which otherwise mess up file structure
+    date = tds[0].text.strip()  # DATA: The date of the decision
+    check = []  # Check if we have this decision already (each case can include multiple decisions)
+    try:
+      for entry in output[name]['info']:
+        check.append(entry['number'] + entry['date'])
+    except KeyError:
+      pass
+    if number + date in check:
+      continue
+    print name, number
+    link = 'http://www.cafc.uscourts.gov' + tds[3].a['href']  # DATA: The link to the PDF
+    r = requests.get(link)  # Get the PDF and save it
+    file_stem = 'cafc_cases/' + name + ' ' + number
+    new_pdf = file_stem + '.pdf'
+    new_txt = file_stem + '.txt'
+    new_tiff = file_stem + '.tiff'
+    data = pdf_read(new_pdf, new_txt)
+    print data
     try:  # If the case exists already, add this decision as part of it
       output[name]['info'].append(data)
     except KeyError: # If the case is new, create an entry for it
@@ -118,8 +124,8 @@ for url in urls:
       output[name]['info'].append(data)
     trigger = True  # Turn the email positive
     msg = '\nThere are new Federal Circuit cases!\n\n'
-    addition = name + ', ' + number + '\nRuling: ' + ruling + '\n' + source + '\nPanel: ' + judges + '\nPDF: ' + link + '\n\n'
-    if precedent == 'Precedential':
+    addition = name + ', ' + number + '\nRuling: ' + data['ruling'] + '\n' + data['source'] + '\nPanel: ' + data['judges'] + '\nPDF: ' + link + '\n\n'
+    if data['precedent'] == 'Precedential':
       section_1 += addition
     else:
       section_2 += addition
