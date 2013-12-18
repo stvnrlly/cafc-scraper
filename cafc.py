@@ -4,6 +4,20 @@ import requests, sys, json, re, subprocess, ghostscript, os, getpass, smtplib
 from bs4 import BeautifulSoup
 from collections import OrderedDict
 
+# mkdir -p in python, from:
+# http://stackoverflow.com/questions/600268/mkdir-p-functionality-in-python
+def mkdir_p(path):
+  try:
+    os.makedirs(path)
+  except OSError as exc: # Python >2.5
+    if exc.errno == errno.EEXIST:
+      pass
+    else:
+      raise
+
+# ensure cafc_cases dir exists
+mkdir_p("cafc_cases")
+
 msg = '\nNo new cases.\n\n'
 section_1 = 'Precedential\n\n'
 section_2 = '\n\nNonprecedential\n\n'
