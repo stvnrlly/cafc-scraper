@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
-import requests, sys, json, re, subprocess, ghostscript, os, getpass, smtplib, errno
+import requests, sys, json, re, subprocess, os, getpass, smtplib, errno
+# import ghostscript
 from bs4 import BeautifulSoup
 from collections import OrderedDict
 
