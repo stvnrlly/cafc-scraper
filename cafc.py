@@ -132,8 +132,8 @@ for url in urls:
       section_2 += addition
 
 output = json.dumps(output, indent=True, ensure_ascii=False)  # Write that file
-#with open('cafc_cases.json', 'w') as f:
-#      f.write(output)
+with open('cafc_cases.json', 'w') as f:
+      f.write(output)
 
 # Send the email if there are new cases
 if not os.path.exists('email_addresses.py'):
@@ -155,4 +155,4 @@ server = smtplib.SMTP('smtp.gmail.com:587')
 server.ehlo()
 server.starttls()
 server.login(sender, password)
-#server.sendmail(sender, recipients, msg)
+server.sendmail(sender, recipients, msg)
