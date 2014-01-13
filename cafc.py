@@ -19,12 +19,14 @@ def mkdir_p(path):
 # ensure cafc_cases dir exists
 mkdir_p("cafc_cases")
 
+path = os.path.dirname(os.path.realpath(__file__))
+
 msg = '\nNo new cases.\n\n'
 section_1 = 'Precedential\n\n'
 section_2 = '\n\nNonprecedential\n\n'
 trigger = False
 try:
-  with open('cafc_cases.json') as d:
+  with open(path + '/cafc_cases.json') as d:
     output = json.load(d)
 except ValueError:  # In case the JSON file is empty for some reason
   output = OrderedDict()
@@ -111,7 +113,7 @@ for url in urls:
     print name, number
     link = 'http://www.cafc.uscourts.gov' + tds[3].a['href']  # DATA: The link to the PDF
     r = requests.get(link)  # Get the PDF and save it
-    file_stem = 'cafc_cases/' + name + ' ' + number
+    file_stem = path + '/cafc_cases/' + name + ' ' + number
     new_pdf = file_stem + '.pdf'
     new_txt = file_stem + '.txt'
     new_tiff = file_stem + '.tiff'
@@ -132,7 +134,7 @@ for url in urls:
       section_2 += addition
 
 output = json.dumps(output, indent=True, ensure_ascii=False)  # Write that file
-with open('cafc_cases.json', 'w') as f:
+with open(path + '/cafc_cases.json', 'w') as f:
       f.write(output)
 
 # Send the email if there are new cases
@@ -155,4 +157,4 @@ server = smtplib.SMTP('smtp.gmail.com:587')
 server.ehlo()
 server.starttls()
 server.login(sender, password)
-server.sendmail(sender, recipients, msg)
+#server.sendmail(sender, recipients, msg)
