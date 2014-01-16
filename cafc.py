@@ -133,7 +133,7 @@ for url in urls:
     else:
       section_2 += addition
 
-output = json.dumps(output, indent=True, ensure_ascii=False)  # Write that file
+output = json.dumps(output, indent=True, ensure_ascii=True)  # Write that file
 with open(path + '/cafc_cases.json', 'w') as f:
       f.write(output)
 
