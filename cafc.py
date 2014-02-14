@@ -138,12 +138,12 @@ with open(path + '/cafc_cases.json', 'w') as f:
       f.write(output)
 
 # Send the email if there are new cases
-if not os.path.exists('email_addresses.py'):
+if not os.path.exists(path + '/email_addresses.py'):
   sender = input('Enter sending GMail address: ')
   password = getpass.getpass('Enter sending address password: ')
   recipients = input('Enter recipient addresses, separated by commas: ')
 else:
-  exec(compile(open('email_addresses.py').read(), 'update_anc_database_creds.py', 'exec'))
+  exec(compile(open(path + '/email_addresses.py').read(), 'email_addresses.py', 'exec'))
 if len(section_1) < 25:
   section_1 += 'None\n\n'
 if len(section_2) < 25:
