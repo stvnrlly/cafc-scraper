@@ -80,7 +80,6 @@ def pdf_read(new_pdf, new_txt):
       source = 'Correction to previous Federal Circuit decision'
     else:
       source = re.sub('\n', ' ', re.search('(On\sappeal|Appeal(s)?\sfrom|(On\s)?Petition[^er])(.|\n)*?(?<!(\sNo|Nos|.\s.))\.', contents).group(0))
-      source = source.title()
     data = {  # Create JSON contents
         'number': number,
         'date': date,
@@ -92,6 +91,8 @@ def pdf_read(new_pdf, new_txt):
         'ruling': ruling,
       }
     return data
+
+count = 0
 
 for url in urls:
   soup = BeautifulSoup(requests.get(url).content)
@@ -132,6 +133,7 @@ for url in urls:
       section_1 += addition
     else:
       section_2 += addition
+    count += 1
 
 output = json.dumps(output, indent=True, ensure_ascii=True)  # Write that file
 with open(path + '/cafc_cases.json', 'w') as f:
@@ -150,7 +152,7 @@ if len(section_2) < 25:
   section_2 += 'None'
 if trigger:
   msg = msg + section_1 + section_2
-msg = 'From: ' + sender + '\nTo: ' + ', '.join(recipients) + '\nSubject: Federal Circuit Report' + msg # Build the email text
+msg = 'From: ' + sender + '\nTo: ' + ', '.join(recipients) + '\nSubject: Federal Circuit Report - ' + str(count) + ' new cases' + msg # Build the email text
 msg = msg.encode('utf-8')
 print msg
 server = smtplib.SMTP('smtp.gmail.com:587')
