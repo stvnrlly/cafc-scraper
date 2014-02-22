@@ -49,7 +49,7 @@ def pdf_read(new_pdf, new_txt):
     with open(new_pdf, 'wb') as fd:
       for chunk in r.iter_content(1024):
         fd.write(chunk)
-    subprocess.call('pdftotext -layout -enc UTF-8 "' + new_pdf + '" > "' + new_txt + '"', shell = True) # Convert PDF to TXT for easier searching
+    subprocess.call('pdftotext -layout -enc ASCII7 "' + new_pdf + '" > "' + new_txt + '"', shell = True) # Convert PDF to TXT for easier searching
     precedent = tds[4].text.strip()  # DATA: Precedential value
     variety = re.search('(?<=\[).*(?=\])', tds[3].text.strip()).group(0)  # DATA: What type of decision was issued
     with open(new_txt, 'r') as txt:
@@ -75,11 +75,10 @@ def pdf_read(new_pdf, new_txt):
       except AttributeError:
         judges = 'Judges not stated'
     judges = re.sub('\s+', ' ', judges).title()
-    judges = judges.decode('utf-8')
     if variety.find('ERRATA') > -1:  # DATA: Where the case originated
       source = 'Correction to previous Federal Circuit decision'
     else:
-      source = re.sub('\n', ' ', re.search('(On\sappeal|Appeal(s)?\sfrom|(On\s)?Petition[^er])(.|\n)*?(?<!(\sNo|Nos|.\s.))\.', contents).group(0))
+      source = re.sub('\n', ' ', re.search('(On\sappeal|Appeal(s)?\sfrom|(On\s)?Petition[^er])(.|\n)*?(?<!(\s(N|n)o|(N|n)os|.\s.))\.', contents).group(0))
     data = {  # Create JSON contents
         'number': number,
         'date': date,
@@ -153,7 +152,6 @@ if len(section_2) < 25:
 if trigger:
   msg = msg + section_1 + section_2
 msg = 'From: ' + sender + '\nTo: ' + ', '.join(recipients) + '\nSubject: Federal Circuit Report - ' + str(count) + ' new cases' + msg # Build the email text
-msg = msg.encode('utf-8')
 print msg
 server = smtplib.SMTP('smtp.gmail.com:587')
 server.ehlo()
