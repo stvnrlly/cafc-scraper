@@ -50,8 +50,6 @@ def pdf_read(new_pdf, new_txt):
       for chunk in r.iter_content(1024):
         fd.write(chunk)
     subprocess.call('pdftotext -layout -enc ASCII7 "' + new_pdf + '" > "' + new_txt + '"', shell = True) # Convert PDF to TXT for easier searching
-    precedent = tds[4].text.strip()  # DATA: Precedential value
-    variety = re.search('(?<=\[).*(?=\])', tds[3].text.strip()).group(0)  # DATA: What type of decision was issued
     with open(new_txt, 'r') as txt:
       contents = re.sub('\t+', ' ', txt.read())
 #    if len(contents) < 10:  # Perform emergency OCR, if necessary
@@ -63,7 +61,7 @@ def pdf_read(new_pdf, new_txt):
 #      with open (new_txt, 'r') as txt:
 #        contents = re.sub('\t+', ' ', txt.read())
     try:
-      ruling = re.sub('\s+', ' ', re.search('(AFFIRMED|REVERSED|REMANDED|VACATED|DISMISSED)(.|\n)*?(?=(\.|$|(?<=ED)\n))', contents).group(0))
+      ruling = re.sub('\s+', ' ', re.search('(AFFIRMED|REVERSED|REMANDED|VACATED|DISMISSED)(.|\n)*?(?=(\.|$|(?<=(ED|RT))\n))', contents).group(0))
       ruling = ruling.title()
     except AttributeError:
       ruling = 'Unmarked ' + variety.lower() + '. Check the PDF.'
@@ -111,6 +109,8 @@ for url in urls:
     if number + date in check:
       continue
     print name, number
+    precedent = tds[4].text.strip()  # DATA: Precedential value
+    variety = re.search('(?<=\[).*(?=\])', tds[3].text.strip()).group(0)  # DATA: What type of decision was issued
     link = 'http://www.cafc.uscourts.gov' + tds[3].a['href']  # DATA: The link to the PDF
     r = requests.get(link)  # Get the PDF and save it
     file_stem = path + '/cafc_cases/' + name + ' ' + number
